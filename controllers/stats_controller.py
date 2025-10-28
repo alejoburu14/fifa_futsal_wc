@@ -1,0 +1,25 @@
+import pandas as pd
+from common.constants import WHITELIST_EVENTS
+
+def compute_event_stats(df_events: pd.DataFrame, match_row: pd.Series):
+    team_names = {str(match_row["HomeId"]): str(match_row["HomeName"]), str(match_row["AwayId"]): str(match_row["AwayName"])}
+    df_all = df_events.copy()
+    df_all["TeamId"] = df_all["TeamId"].astype(str)
+    df_all["TeamName"] = df_all["TeamId"].map(team_names)
+    df_all["Description"] = df_all["Description"].astype(str)
+
+    counts = (df_all.groupby("TeamName", dropna=False).size().reset_index(name="TotalEvents")
+              .sort_values("TotalEvents", ascending=False))
+
+    dist = df_all[df_all["Description"].isin(WHITELIST_EVENTS)]
+    if dist.empty:
+        dist_pivot = pd.DataFrame({"TeamName": [team_names[str(match_row["HomeId"])], team_names[str(match_row["AwayId"])]],
+                                   **{evt: [0,0] for evt in WHITELIST_EVENTS}})
+    else:
+        dist_pivot = (dist.pivot_table(index="TeamName", columns="Description", values="TeamId", aggfunc="count", fill_value=0)
+                      .reindex(columns=WHITELIST_EVENTS, fill_value=0).reset_index())
+
+    teams_order = [team_names[str(match_row["HomeId"])], team_names[str(match_row["AwayId"])]]
+    counts = counts.set_index("TeamName").reindex(teams_order, fill_value=0).reset_index()
+    dist_pivot = dist_pivot.set_index("TeamName").reindex(teams_order, fill_value=0).reset_index()
+    return counts, dist_pivot
