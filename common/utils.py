@@ -109,21 +109,51 @@ def sort_matches_for_select(df: pd.DataFrame) -> pd.DataFrame:
                         ascending=[False,True,True,False,True,True], kind="mergesort")
     return df.drop(columns=["__is_group","__g_rank","__s_rank","__has_date"])
 
-def selectbox_with_placeholder(label: str, options: List[str], key: Optional[str] = None):
+def selectbox_with_placeholder(
+    label: str,
+    options: List[str],
+    key: Optional[str] = None,
+    default_index: Optional[int] = None,
+):
+    """
+    A selectbox that can start empty (placeholder) or preselect an item (default_index).
+    - Uses a hidden label to avoid duplicate text under the title.
+    - Works on older Streamlit as well.
+    """
     try:
-        return st.selectbox("", options=options, index=None, placeholder=label, label_visibility="collapsed", key=key)
+        # Newer Streamlit
+        return st.selectbox(
+            "",  # hide label text
+            options=options,
+            index=default_index,            # None -> placeholder shown; int -> preselect
+            placeholder=label,
+            label_visibility="collapsed",
+            key=key,
+        )
     except TypeError:
-        placeholder = f"— {label} —"
-        choice = st.selectbox(" ", options=[placeholder] + options, index=0, key=key)
-        return None if choice == placeholder else choice
+        # Older Streamlit fallback
+        if default_index is None:
+            placeholder = f"— {label} —"
+            choice = st.selectbox(" ", options=[placeholder] + options, index=0, key=key)
+            return None if choice == placeholder else choice
+        else:
+            # Preselect the requested option
+            return st.selectbox(" ", options=options, index=default_index, key=key)
 
 def process_timeline(df_events: pd.DataFrame, df_squads: pd.DataFrame, match_row: pd.Series) -> pd.DataFrame:
-    team_names = {str(match_row["HomeId"]): str(match_row["HomeName"]), str(match_row["AwayId"]): str(match_row["AwayName"])}
+    """Join team & player names; keep only attacking actions. Keeps TeamId for flag mapping."""
+    team_names = {
+        str(match_row["HomeId"]): str(match_row["HomeName"]),
+        str(match_row["AwayId"]): str(match_row["AwayName"]),
+    }
     df = df_events.copy()
     df["TeamId"] = df["TeamId"].astype(str)
     df["TeamName"] = df["TeamId"].map(team_names)
     if not df_squads.empty:
-        df = df.merge(df_squads[["PlayerId","PlayerName"]], on="PlayerId", how="left")
-    df = df[df["Description"].isin(["Attempt at Goal","Goal!"])]
-    df = df[["TeamName","Description","MatchMinute","PlayerName"]].fillna("")
+        df = df.merge(df_squads[["PlayerId", "PlayerName"]], on="PlayerId", how="left")
+    # Only attacking actions
+    df = df[df["Description"].isin(["Attempt at Goal", "Goal!"])]
+    # Keep TeamId so we can map flags later
+    df = df[["TeamId", "TeamName", "Description", "MatchMinute", "PlayerName"]].fillna("")
     return df.sort_values(by=["MatchMinute"]).reset_index(drop=True)
+
