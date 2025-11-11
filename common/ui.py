@@ -1,35 +1,34 @@
+# common/ui.py
+from __future__ import annotations
+from pathlib import Path
 import streamlit as st
 
-def sidebar_header(user: str | None = None, show_custom_nav: bool = True):
-    """Render a consistent sidebar header across all pages: Signed in / Logout and page links."""
-    has_page_link = hasattr(st.sidebar, "page_link")
+# Project root = .../fifa_futsal_wc
+APP_ROOT = Path(__file__).resolve().parents[1]
+
+def _link_if_exists(rel_path: str, label: str, icon: str = "📄"):
+    """Safely add a page link if the target file exists."""
+    target = (APP_ROOT / rel_path)
+    if target.exists():
+        # Streamlit expects an app-relative path with forward slashes
+        st.sidebar.page_link(rel_path.replace("\\", "/"), label=label, icon=icon)
+
+def sidebar_header(user: str | None, show_custom_nav: bool = False):
+    # Hide the built-in pages nav so only our custom links appear
+    st.markdown(
+        "<style>[data-testid='stSidebarNav']{display:none !important;}</style>",
+        unsafe_allow_html=True,
+    )
     with st.sidebar:
-        # Hide Streamlit's default Pages nav so our custom links sit at the top
-        if show_custom_nav and has_page_link:
-            st.markdown(
-                """
-                <style>
-                [data-testid="stSidebarNav"] { display: none !important; }
-                </style>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        # Signed in / Logout
-        if user:
-            st.caption(f"Signed in as **{user}**")
-        else:
-            st.caption("Signed in")
-
-        if st.button("Logout", use_container_width=True, key="logout-btn"):
+        st.markdown("**Signed in as:** " + (user or "—"))
+        if st.button("Logout"):
             st.session_state.clear()
             if hasattr(st, "rerun"): st.rerun()
             else: st.experimental_rerun()
 
-        st.divider()
-
-        # Custom page links (only if supported by your Streamlit version)
-        if show_custom_nav and has_page_link:
-            st.subheader("Pages")
-            st.sidebar.page_link("main.py", label="Home", icon="🏠")
-            st.sidebar.page_link("pages/2_Statistics.py", label="Statistics", icon="📊")
+        if show_custom_nav:
+            st.divider()
+            st.markdown("#### Pages")
+            st.page_link("main.py", label="Home", icon="🏠")
+            st.page_link("pages/2_Statistics.py", label="Statistics", icon="📊")
+            st.page_link("pages/3_Infographic.py", label="Infographic", icon="🖼️")

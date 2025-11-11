@@ -53,3 +53,31 @@ def flags_by_teamid(df_flags: pd.DataFrame) -> Dict[str, str]:
 def flag_url_from_abbr(abbreviation: Optional[str]) -> str:
     """Build a single flag URL from a code like 'ARG'."""
     return f"{FLAG_BASE}/{abbreviation}" if abbreviation else ""
+
+# ---------- Simple, cached lookups you can import from pages ----------
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_flags_map(season_id: str = SEASONID) -> Dict[str, str]:
+    """
+    Cached {TeamId -> FlagURL} map for fast lookups in pages.
+    """
+    df = get_team_flags(season_id)
+    return flags_by_teamid(df)
+
+
+def get_flag_url_by_team_id(team_id: str, season_id: str = SEASONID) -> str:
+    """
+    Return the square flag URL for a given TeamId ('' if not found).
+    """
+    mp = get_flags_map(season_id)
+    return mp.get(str(team_id), "")
+
+
+def get_flags_for_match(match_row: pd.Series, season_id: str = SEASONID) -> tuple[str, str]:
+    """
+    Convenience: (home_flag_url, away_flag_url) for the selected match.
+    """
+    mp = get_flags_map(season_id)
+    home = mp.get(str(match_row["HomeId"]), "")
+    away = mp.get(str(match_row["AwayId"]), "")
+    return home, away
