@@ -125,13 +125,15 @@ def pick_match_colors(
 ) -> MatchPalette:
     """
     Choose (home_color, away_color) from the SQLite DB.
-    Rule:
-      - Use Home.home vs Away.away from DB.
-      - If similar, use Away.home.
-      - If still similar, darken away slightly.
-    Falls back to deterministic colors if a team is not found in the DB.
+
+    NEW rule:
+      1) Start with Home.home  vs  Away.home
+      2) If similar, switch the away to Away.away
+      3) If still similar, darken the away slightly
+
+    Falls back to deterministic colours if a team is not found in the DB.
     """
-    # Try to fetch FIFA abbreviations (ARG, BRA, …) from the cached flags
+    # Try to fetch FIFA abbreviations (ARG, BRA, …) from cached flags
     abbr_home = abbr_away = None
     try:
         df_flags: pd.DataFrame = get_team_flags()
@@ -164,13 +166,15 @@ def pick_match_colors(
         base = "#{:02X}{:02X}{:02X}".format(int(r * 255), int(g * 255), int(b * 255))
         pal_away = {"home": base, "away": _lighten_or_darken(base, -0.25)}
 
+    # --- NEW default: both teams' HOME colours ---
     c_home = pal_home["home"]
-    c_away = pal_away["away"]
+    c_away = pal_away["home"]
 
-    # Similarity rule: if clash, switch to away's home; if still close, darken
+    # If they clash, try away's AWAY colour; if still close, darken away a bit
     if _similar(c_home, c_away):
-        c_away = pal_away["home"]
+        c_away = pal_away["away"]
     if _similar(c_home, c_away):
         c_away = _lighten_or_darken(c_away, -0.25)
 
     return MatchPalette(home_color=c_home, away_color=c_away)
+
