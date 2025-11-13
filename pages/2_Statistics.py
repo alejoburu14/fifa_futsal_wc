@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 from controllers.data_controller import load_match_datasets
 from controllers.stats_controller import compute_event_stats
+from controllers.auth_controller import logout_button
 from common.ui import sidebar_header
 
 from common.metrics import (
@@ -18,11 +19,17 @@ from common.plots import (
 # ------------------------------------------------------------
 # Page setup & consistent sidebar
 # ------------------------------------------------------------
-st.set_page_config(page_title="Statistics", layout="wide")
-sidebar_header(user=st.session_state.get("username"), show_custom_nav=True)
-
 SMALL_FIGSIZE = (5.2, 2.0)  # <- compact size for all charts
 
+st.set_page_config(page_title="Statistics", layout="wide")
+
+def _ensure_auth():
+    if not st.session_state.get("authenticated"):
+        try:
+            st.switch_page("main.py")
+        except Exception:
+            st.info("Please sign in on **Home** first.")
+            st.stop()
 
 def _ensure_match_selected():
     if "match_row" not in st.session_state or not st.session_state["match_row"]:
@@ -52,6 +59,10 @@ def _is_light(hex_color: str) -> bool:
 
 
 def main():
+    _ensure_auth()
+    sidebar_header(user=st.session_state.get("username"), show_custom_nav=True)
+    logout_button()
+
     _ensure_match_selected()
 
     # Recover selection & load match data

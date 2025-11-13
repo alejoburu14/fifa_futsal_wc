@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 from io import BytesIO
+from controllers.auth_controller import logout_button
+from common.ui import sidebar_header
 
 # --- Header layout knobs (easy to tweak) ---
 HEADER_POS = {
@@ -25,13 +27,13 @@ plt.rcParams.update({
 
 st.set_page_config(page_title="Infographic", layout="wide")
 
-# Sidebar header (don’t hide page if the import fails)
-try:
-    from common.ui import sidebar_header
-    sidebar_header(user=st.session_state.get("username"), show_custom_nav=True)
-except Exception:
-    pass
-
+def _ensure_auth():
+    if not st.session_state.get("authenticated"):
+        try:
+            st.switch_page("main.py")
+        except Exception:
+            st.info("Please sign in on **Home** first.")
+            st.stop()
 
 def _ensure_match_selected():
     if "match_row" not in st.session_state or not st.session_state["match_row"]:
@@ -141,6 +143,10 @@ def _make_figure(match_row, events, df_attack, minute_df, goals_df, colors_map,
 
 
 def main():
+    _ensure_auth()
+    sidebar_header(user=st.session_state.get("username"), show_custom_nav=True)
+    logout_button()  # optional
+
     _ensure_match_selected()
 
     # Lazy imports

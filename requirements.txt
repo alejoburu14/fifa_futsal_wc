@@ -1,4 +1,8 @@
 streamlit>=1.30
 pandas>=2.2
+numpy>=1.26
+matplotlib>=3.7
+pillow>=10.0
 requests>=2.31
 python-dotenv>=1.0
+extra-streamlit-components>=0.1.60,<0.2

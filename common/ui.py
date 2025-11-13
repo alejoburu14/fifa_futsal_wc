@@ -14,17 +14,11 @@ def _link_if_exists(rel_path: str, label: str, icon: str = "📄"):
         st.sidebar.page_link(rel_path.replace("\\", "/"), label=label, icon=icon)
 
 def sidebar_header(user: str | None, show_custom_nav: bool = False):
-    # Hide the built-in pages nav so only our custom links appear
-    st.markdown(
-        "<style>[data-testid='stSidebarNav']{display:none !important;}</style>",
-        unsafe_allow_html=True,
-    )
+    # Hide Streamlit's auto page list so only our links show
+    st.markdown("<style>[data-testid='stSidebarNav']{display:none !important;}</style>", unsafe_allow_html=True)
+
     with st.sidebar:
-        st.markdown("**Signed in as:** " + (user or "—"))
-        if st.button("Logout"):
-            st.session_state.clear()
-            if hasattr(st, "rerun"): st.rerun()
-            else: st.experimental_rerun()
+        st.markdown(f"**Signed in as:** {user or '—'}")
 
         if show_custom_nav:
             st.divider()

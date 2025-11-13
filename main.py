@@ -2,7 +2,7 @@ import streamlit as st
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
 
-from controllers.auth_controller import login_page
+from controllers.auth_controller import login_page, logout_button
 from controllers.data_controller import load_matches, load_match_datasets
 from common.utils import sort_matches_for_select, selectbox_with_placeholder
 from common.ui import sidebar_header   # <-- NEW
@@ -13,11 +13,10 @@ st.set_page_config(page_title="Futsal WC — Home", layout="wide")
 load_dotenv(override=False)
 
 def main():
-    user = login_page()
-    assert user
-
     # Consistent sidebar header ABOVE page links
+    user, _ = login_page()       # authenticator object no longer used
     sidebar_header(user=user, show_custom_nav=True)
+    logout_button()
 
     st.title("🏆 FIFA Futsal World Cup — Matches & Timelines")
     st.caption("Select a match below. The attacking timeline will appear under the box.")
