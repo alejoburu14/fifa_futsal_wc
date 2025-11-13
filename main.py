@@ -33,7 +33,7 @@ def main():
     df_sorted = sort_matches_for_select(df_matches)
 
     labels = df_sorted.apply(
-        lambda r: f'{r["GroupName"]} | {r["StageName"]} | {r["MatchName"]} | {r["KickoffDate"]}',
+        lambda r: f'{r["StageName"]} | {r["GroupName"]} | {r["MatchName"]} | {r["KickoffDate"]}',
         axis=1
     ).tolist()
     ids = df_sorted["MatchId"].astype(str).tolist()
@@ -104,7 +104,7 @@ def main():
     with st.spinner(f'Loading timeline for {match_row["MatchName"]}...'):
         events, squads, timeline = load_match_datasets(match_row)
 
-    st.header("Timeline — Attacking Actions")
+    st.header("Timeline — Attacking Actions (Attempts & Goals)")
 
     # Compute the final score from full events (Goal!)
     goals = events[events["Description"] == "Goal!"].copy()
@@ -113,8 +113,8 @@ def main():
     away_goals = int((goals["TeamId"] == str(match_row["AwayId"])).sum())
 
     st.caption(
-        f'**Group:** {match_row["GroupName"]}  |  '
         f'**Stage:** {match_row["StageName"]}  |  '
+        f'**Group:** {match_row["GroupName"]}  |  '
         f'**Match:** {match_row["MatchName"]}  |  '
         f'**Date:** {match_row.get("KickoffDate", "")}  |  '
         f'**Score:** {match_row["HomeName"]} ({home_goals}) - {match_row["AwayName"]} ({away_goals})'

@@ -10,7 +10,7 @@ from common.ui import sidebar_header
 # --- Header layout knobs (easy to tweak) ---
 HEADER_POS = {
     "title_y":    0.990,  # main title
-    "subtitle_y": 0.952,  # line under title
+    "subtitle_y": 0.945,  # line under title
     "score_y":    0.912,  # score line
     "legend_y":   0.878,  # legend baseline
 }
@@ -96,31 +96,35 @@ def _make_figure(match_row, events, df_attack, minute_df, goals_df, colors_map,
                   halftime_minute=HALFTIME_MINUTE,
                   colors_map={home: col_home, away: col_away},
                   ax=ax1, show_legend=False)
+    ax1.set_title("Momentum per minute (Attempts=1, Goal=2)", fontsize=8, pad=6, loc="left")
 
     ax2 = fig.add_subplot(gs[0, 1])
     plot_smoothed(minute_df, (home, away),
                   tau_minutes=SMOOTH_TAU_MIN,
                   colors_map={home: col_home, away: col_away},
                   ax=ax2, legend_mode="none")
+    ax2.set_title("Smoothed momentum (EWMA)", fontsize=8, pad=6, loc="left")
 
     ax3 = fig.add_subplot(gs[1, 0])
     plot_top_players(df_attack, top_n=TOP_N_PLAYERS,
                      colors_map={home: col_home, away: col_away},
                      ax=ax3, show_legend=False)
+    ax3.set_title(f"Top {TOP_N_PLAYERS} players", fontsize=8, pad=6, loc="left")
 
     ax4 = fig.add_subplot(gs[1, 1])
     plot_cumulative(df_attack,
                     colors_map={home: col_home, away: col_away},
                     ax=ax4, show_legend=False)
+    ax4.set_title("Cumulative attack rate", fontsize=8, pad=6, loc="left")
 
     # Header block (smaller fonts + extra spacing)
-    title    = "Infographic — FIFA Futsal World Cup"
+    title    = "FIFA Futsal World Cup"
     subtitle = f'{match_row["StageName"]} • {match_row["GroupName"]} • {match_row.get("LocalDate", match_row.get("KickoffDate",""))}'
     scoreln  = f'Score: {home} {home_g} - {away_g} {away}'
 
     fig.suptitle(title, fontsize=13, y=HEADER_POS["title_y"])
-    fig.text(0.5, HEADER_POS["subtitle_y"], subtitle, ha="center", va="center", fontsize=10)
-    fig.text(0.5, HEADER_POS["score_y"],    scoreln,  ha="center", va="center", fontsize=10.5)
+    fig.text(0.5, HEADER_POS["subtitle_y"], subtitle, ha="center", va="center", fontsize=8)
+    fig.text(0.5, HEADER_POS["score_y"],    scoreln,  ha="center", va="center", fontsize=10)
 
     # Compact legend below the score (use the same color patches)
     handles = [Patch(facecolor=col_home, label=home),

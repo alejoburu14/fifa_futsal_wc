@@ -80,12 +80,12 @@ def main():
     col_home, col_away = colors_map.get(home, "#777777"), colors_map.get(away, "#999999")
 
     st.header("Statistics")
-    st.caption("Computed from the full timeline (before filtering attacking actions).")
+    st.caption("Computed from the full timeline.")
 
     # ------------------------------------------------------------
     # TABLE + BAR: Events by team
     # ------------------------------------------------------------
-    st.subheader("Eventos por equipo")
+    st.subheader("Events by team")
     st.dataframe(
         counts[["Flag", "TeamName", "TotalEvents"]],
         use_container_width=True,
@@ -109,7 +109,7 @@ def main():
     # ------------------------------------------------------------
     # TABLE + GROUPED BARS: Event distribution
     # ------------------------------------------------------------
-    st.subheader("Distribución de eventos por equipo")
+    st.subheader("Event distribution by team")
     st.caption("Events: Attempt at Goal, Foul, Goal!, Assist, Corner")
     st.dataframe(
         dist[["Flag", "TeamName", "Attempt at Goal", "Foul", "Goal!", "Assist", "Corner"]],
@@ -137,7 +137,7 @@ def main():
     minute_df = build_minute_matrix(df_attack, match_row)          # per-minute mirror
     goals_df  = build_goals_only(df_attack)                        # only goals for markers
 
-    st.subheader("Momentum por minuto (Intentos=1, Gol=2)")
+    st.subheader("Momentum per minute (Attempts=1, Goal=2)")
     _swatch_row(home, away, col_home, col_away)
 
     fig3, ax3 = plt.subplots(figsize=SMALL_FIGSIZE)
@@ -150,7 +150,7 @@ def main():
     )
     st.pyplot(fig3, use_container_width=False)
 
-    st.subheader(f"Momentum suavizado (EWMA, τ={SMOOTH_TAU_MIN:g} min)")
+    st.subheader(f"Smoothed momentum (EWMA, τ={SMOOTH_TAU_MIN:g} min)")
     _swatch_row(home, away, col_home, col_away)
 
     fig4, ax4 = plt.subplots(figsize=SMALL_FIGSIZE)
@@ -163,7 +163,7 @@ def main():
     )
     st.pyplot(fig4, use_container_width=False)
 
-    st.subheader(f"Top {TOP_N_PLAYERS} jugadores en ataque")
+    st.subheader(f"Top {TOP_N_PLAYERS} attacking players")
     _swatch_row(home, away, col_home, col_away)
 
     fig5, ax5 = plt.subplots(figsize=SMALL_FIGSIZE)
@@ -176,7 +176,7 @@ def main():
     )
     st.pyplot(fig5, use_container_width=False)
 
-    st.subheader("Ritmo de ataque acumulado")
+    st.subheader("Cumulative attack rate")
     _swatch_row(home, away, col_home, col_away)
 
     fig6, ax6 = plt.subplots(figsize=SMALL_FIGSIZE)
