@@ -30,6 +30,33 @@ from common.plots import (
     plot_events_count_bar, plot_event_distribution_grouped
 )
 
+# Explanations for each plot ---
+CHART_DESCRIPTIONS = {
+    "momentum": (
+        "This chart shows the **pulse of the game minute by minute**. "
+        "Whenever a team creates chances or scores, its bar grows in that minute "
+        "(goals count a bit more than shots). A **cluster of bars** for one team "
+        "means they enjoyed a spell of pressure; **alternating bars** suggest a "
+        "more end-to-end phase."
+    ),
+    "smoothed": (
+        "Here we **smooth the minute-by-minute noise** to reveal the **trend**. "
+        "When a team’s line rises above zero, they’re generally on top during that spell. "
+        "**Crossovers** signal **momentum swings**; **long gentle rises** reflect sustained control."
+    ),
+    "top_players": (
+        "These are the **players most involved in attack**. We combine shots and goals "
+        "(with goals counting a bit more) to show **who drove the team forward**. "
+        "Names at the top contributed the most to creating or finishing chances."
+    ),
+    "cumulative": (
+        "This line shows the **running total of attacking actions** as the game unfolds. "
+        "A **steeper climb** means a burst of pressure; a **wider gap** between teams indicates "
+        "one side built a clear edge over time; a **late surge** tells the story of a final push."
+    ),
+}
+
+
 # Small compact size for the inline figures used on this page
 SMALL_FIGSIZE = (5.2, 2.0)
 
@@ -161,6 +188,7 @@ def main():
         show_legend=False,  # ensure no legend
     )
     st.pyplot(fig3, use_container_width=False)
+    st.caption(CHART_DESCRIPTIONS["momentum"])
 
     st.subheader(f"Smoothed momentum (EWMA, τ={SMOOTH_TAU_MIN:g} min)")
     _swatch_row(home, away, col_home, col_away)
@@ -174,6 +202,7 @@ def main():
         legend_mode="none",
     )
     st.pyplot(fig4, use_container_width=False)
+    st.caption(CHART_DESCRIPTIONS["smoothed"])
 
     st.subheader(f"Top {TOP_N_PLAYERS} attacking players")
     _swatch_row(home, away, col_home, col_away)
@@ -187,6 +216,7 @@ def main():
         show_legend=False,
     )
     st.pyplot(fig5, use_container_width=False)
+    st.caption(CHART_DESCRIPTIONS["top_players"])
 
     st.subheader("Cumulative attack rate")
     _swatch_row(home, away, col_home, col_away)
@@ -199,6 +229,7 @@ def main():
         show_legend=False,
     )
     st.pyplot(fig6, use_container_width=False)
+    st.caption(CHART_DESCRIPTIONS["cumulative"])
 
 
 if __name__ == "__main__":
