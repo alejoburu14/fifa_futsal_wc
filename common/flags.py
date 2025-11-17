@@ -1,3 +1,13 @@
+"""
+Helpers to fetch and map team flag URLs.
+
+This module fetches a list of teams for a season and constructs a small
+DataFrame with flag URLs that can be displayed in the app. It also provides
+simple convenience functions that return mappings used by other modules to
+insert flag URLs into DataFrames.
+"""
+
+#Import libraries
 from __future__ import annotations
 from typing import Dict, Optional
 

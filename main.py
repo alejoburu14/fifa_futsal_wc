@@ -1,3 +1,29 @@
+"""
+Main application entry for the FIFA Futsal World Cup Streamlit app.
+
+This module defines the top-level Streamlit page that users see when they
+open the app. It handles:
+    - application configuration (`st.set_page_config`),
+    - environment variable loading via `python-dotenv`,
+    - user authentication and sidebar rendering (delegated to
+        `controllers.auth_controller` and `common.ui`),
+    - loading match lists and match-specific datasets from the API (via
+        `controllers.data_controller`),
+    - building the selectbox used to choose a match and preparing the
+        timeline/visualization data to show below it.
+
+This file only composes logic from helper modules; most data-fetching and
+plotting work is implemented under `common/` and `controllers/`.
+
+Notes for a new Python learner:
+    - Side effects: calling this module runs Streamlit code that renders the
+        UI. Protect long-running computations with `st.spinner` or caching
+        helpers to avoid repeated work during reruns.
+    - Session state: the app stores the selected match and cached row in
+        `st.session_state` so other pages can access the selection.
+"""
+
+# Import libraries
 import streamlit as st
 from typing import Dict, List, Optional
 from dotenv import load_dotenv
@@ -5,10 +31,11 @@ from dotenv import load_dotenv
 from controllers.auth_controller import login_page, logout_button
 from controllers.data_controller import load_matches, load_match_datasets
 from common.utils import sort_matches_for_select, selectbox_with_placeholder
-from common.ui import sidebar_header   # <-- NEW
+from common.ui import sidebar_header   # UI helper for a consistent sidebar
 from common.colors import pick_match_colors
 from common.metrics import parse_time_to_seconds
 
+# Configure Streamlit page and load environment variables from `.env`.
 st.set_page_config(page_title="Futsal WC — Home", layout="wide")
 load_dotenv(override=False)
 

@@ -1,3 +1,17 @@
+"""
+Statistics page components.
+
+This Streamlit page composes several data transformation functions and
+plotting helpers to render tables and charts summarizing a selected match.
+
+It expects the user to be authenticated and a `match_row` to be present in
+`st.session_state` (both enforced by helper checks). The page logic is kept
+small: it only orchestrates loading data, computing the derived tables via
+`controllers.stats_controller`, and calling plotting helpers from
+`common.plots`.
+"""
+
+# Import libraries
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,10 +30,8 @@ from common.plots import (
     plot_events_count_bar, plot_event_distribution_grouped
 )
 
-# ------------------------------------------------------------
-# Page setup & consistent sidebar
-# ------------------------------------------------------------
-SMALL_FIGSIZE = (5.2, 2.0)  # <- compact size for all charts
+# Small compact size for the inline figures used on this page
+SMALL_FIGSIZE = (5.2, 2.0)
 
 st.set_page_config(page_title="Statistics", layout="wide")
 

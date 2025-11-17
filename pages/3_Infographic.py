@@ -1,4 +1,14 @@
-# pages/3_Infographic.py
+"""
+Infographic page: compose several plots into a single figure for download.
+
+This page builds a composite matplotlib figure (4 panels) that summarizes a
+selected match. It uses the plotting helpers from `common.plots` and
+resources such as team flags to decorate the infographic. The module keeps
+network and image loading inside try/except blocks so that a missing flag
+image does not break the page.
+"""
+
+# Import libraries
 import streamlit as st
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -51,22 +61,50 @@ def _compute_score(events, home_id, away_id):
 
 
 def _add_flag(fig: plt.Figure, url: str, left: float, top: float, width: float = 0.10):
-    """Place a flag image at (left, top) in figure coords. Safe if download fails."""
+    """Place a flag image at (left, top) in figure coordinates.
+
+    Implementation notes:
+      - This helper is intentionally forgiving: failure to download or open
+        the image is caught and silently ignored so that missing flags do not
+        break the infographic generation.
+      - A desktop User-Agent header is used because some image servers
+        block default Python UA strings.
+      - The image is placed using `fig.add_axes` with absolute figure
+        coordinates so flags remain in consistent positions regardless of
+        subplot layouts.
+    """
     if not url:
+        # Nothing to do when an empty URL is provided.
         return
     try:
+        # Lazy import Pillow here so importing the page module doesn't
+        # immediately require the library unless this function runs.
         from PIL import Image
         import requests
         from io import BytesIO as _BIO
-        # Some servers dislike default UA – send a desktop UA
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                                 "Chrome/120.0.0.0 Safari/537.36"}
+
+        # Some servers dislike default UA – send a standard desktop UA string
+        # to improve the chance of a successful fetch.
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+        }
+
         r = requests.get(url, timeout=8, headers=headers)
         r.raise_for_status()
+
+        # Open image and ensure we have an alpha channel for safe compositing.
         im = Image.open(_BIO(r.content)).convert("RGBA")
     except Exception:
+        # Do not raise: infographic generation should continue even if a
+        # flag cannot be fetched for any reason.
         return
+
+    # Compute box height preserving original aspect ratio and add the image
+    # to the figure at the requested location (top-left anchor).
     w = width
     h = width * (im.size[1] / im.size[0])  # keep aspect ratio
     ax_img = fig.add_axes([left, top - h, w, h], anchor="NW")

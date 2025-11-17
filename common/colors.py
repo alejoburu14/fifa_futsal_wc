@@ -1,4 +1,21 @@
-# common/colors.py
+"""
+Team color selection utilities.
+
+This module loads a small SQLite database containing team color palettes and
+provides a deterministic fallback when a team is not present in the DB.
+
+Primary API:
+    - `pick_match_colors(home_name, away_name, home_id, away_id)` returns a
+        `MatchPalette` dataclass with `home_color` and `away_color` hex strings.
+
+Implementation notes:
+    - The DB is expected to contain `team_colors(name, abbr, home_color, away_color)`.
+    - The function attempts to use FIFA abbreviations (via `common.flags`) to
+        improve lookup robustness. If the DB entry is missing, a deterministic
+        HSV-based fallback color is generated from the team name.
+"""
+
+#Import libraries
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
@@ -126,7 +143,7 @@ def pick_match_colors(
     """
     Choose (home_color, away_color) from the SQLite DB.
 
-    NEW rule:
+    Rule:
       1) Start with Home.home  vs  Away.home
       2) If similar, switch the away to Away.away
       3) If still similar, darken the away slightly
@@ -166,7 +183,7 @@ def pick_match_colors(
         base = "#{:02X}{:02X}{:02X}".format(int(r * 255), int(g * 255), int(b * 255))
         pal_away = {"home": base, "away": _lighten_or_darken(base, -0.25)}
 
-    # --- NEW default: both teams' HOME colours ---
+    # --- Default: both teams' HOME colours ---
     c_home = pal_home["home"]
     c_away = pal_away["home"]
 

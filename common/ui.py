@@ -1,9 +1,17 @@
-# common/ui.py
+"""
+UI helpers for consistent sidebar and page-link rendering.
+
+This module centralizes small UI conveniences so that every page has a
+consistent sidebar header and page navigation. It also provides a helper to
+conditionally render page links only when the target file exists.
+"""
+
+#Import libraries
 from __future__ import annotations
 from pathlib import Path
 import streamlit as st
 
-# Project root = .../fifa_futsal_wc
+# Project root directory (one level above the `common` package)
 APP_ROOT = Path(__file__).resolve().parents[1]
 
 def _link_if_exists(rel_path: str, label: str, icon: str = "📄"):

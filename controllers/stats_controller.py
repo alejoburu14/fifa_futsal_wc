@@ -1,6 +1,18 @@
+"""
+Statistics helpers for computing summary tables used by the Statistics page.
+
+This module receives raw events for a match and computes two derived tables:
+    - `counts`: total number of events per team with an associated flag URL
+    - `dist_pivot`: a pivot table with counts for selected event types per team
+
+Functions here are intentionally small and pure so they are easy to test.
+The page that calls `compute_event_stats` is responsible for display and
+layout; this module focuses on data transformations only.
+"""
+# Import libraries
 import pandas as pd
 from common.constants import WHITELIST_EVENTS
-from common.flags import get_team_flags, flags_by_teamid   # <-- NEW
+from common.flags import get_team_flags, flags_by_teamid   # map TeamId -> flag URL
 
 def compute_event_stats(df_events: pd.DataFrame, match_row: pd.Series) -> tuple[pd.DataFrame, pd.DataFrame]:
     team_names = {

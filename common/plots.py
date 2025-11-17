@@ -1,4 +1,18 @@
-# common/plots.py
+"""
+Plotting helpers used by the Streamlit pages.
+
+This module contains a small set of matplotlib helper functions that render
+the visualizations used by the app:
+    - momentum bars per minute (mirror bars)
+    - EWMA-smoothed momentum lines
+    - top players horizontal bar chart
+    - cumulative attack rate
+
+The plotting functions accept pandas DataFrames and return matplotlib Axes
+objects so they can be composed into larger figures in the pages.
+"""
+
+#Import libraries
 from __future__ import annotations
 from typing import Optional, Tuple, Dict
 
@@ -10,11 +24,11 @@ from matplotlib.patches import Patch, Circle, Rectangle
 import matplotlib.patheffects as pe
 
 from common.metrics import (
-    HALFTIME_MINUTE, SMOOTH_TAU_MIN, ATTEMPT_WEIGHT, GOAL_WEIGHT, TOP_N_PLAYERS,
-    ewma, teams_ordered, team_colors_map
+        HALFTIME_MINUTE, SMOOTH_TAU_MIN, ATTEMPT_WEIGHT, GOAL_WEIGHT, TOP_N_PLAYERS,
+        ewma, teams_ordered, team_colors_map
 )
 
-DEFAULT_FIGSIZE = (6.6, 2.6)  # more compact; tweak if you want even smaller
+DEFAULT_FIGSIZE = (6.6, 2.6)  # reasonable default figure size for the compact UI
 
 def _new_ax(ax=None):
     """Return a compact figure/axes when ax is None; otherwise reuse the axes."""
@@ -144,51 +158,72 @@ def plot_momentum(minute_df: pd.DataFrame,
     col_home = colors.get(home, "#777777")
     col_away = colors.get(away, "#999999")
 
-    x  = minute_df["minute"].values
+    # Prepare arrays for plotting. 'up' holds the home-team per-minute weight
+    # and 'dn' holds the away-team weight negated so bars mirror below zero.
+    x = minute_df["minute"].values
     up = minute_df["team_a"].values
     dn = -minute_df["team_b"].values
 
+    # Draw the mirror bars for each minute. Use `_edge_kw_for` to add a
+    # thin black outline when the color is very light so bars remain visible.
     ax.bar(x, up, width=0.8, color=col_home, **_edge_kw_for(col_home))
     ax.bar(x, dn, width=0.8, color=col_away, **_edge_kw_for(col_away))
+
+    # Horizontal centerline (zero) and a vertical halftime marker for context.
     ax.axhline(0, color="black", linewidth=1)
     ax.axvline(halftime_minute, linestyle="--", linewidth=1, color="gray")
 
-    ax.set_xlabel("Minute", fontsize=6); ax.set_ylabel("Weight per minute", fontsize=6)
+    # Compact axis labels for in-page figures
+    ax.set_xlabel("Minute", fontsize=6)
+    ax.set_ylabel("Weight per minute", fontsize=6)
     ax.tick_params(axis="both", labelsize=6)
 
-    # labels: time only, very small; anti-overlap with pixel offsets; no icons
+    # labels: time only, very small; anti-overlap with pixel offsets
     if not goals_df.empty:
-        y_span   = float(max(1.0, np.nanmax(np.abs(np.r_[up, dn]))))
-        tip_pad  = 0.05 * y_span
+        # Layout and offset configuration for goal labels so they don't
+        # overlap and remain readable. Values are in pixels for the offset
+        # that will be applied via `textcoords="offset points"`.
+        y_span = float(max(1.0, np.nanmax(np.abs(np.r_[up, dn]))))
+        tip_pad = 0.05 * y_span
         jitter_px = [-8, 0, 8]
         base_y_px = -1
         step_y_px = 6
-        bump_px   = 6
+        bump_px = 6
 
         prev_minute = {home: None, away: None}
         for idx, team in enumerate((home, away)):
+            # sign determines whether annotations appear above (home) or
+            # below (away) the corresponding bar.
             sign = 1 if idx == 0 else -1
-            col  = "team_a" if idx == 0 else "team_b"
+            col = "team_a" if idx == 0 else "team_b"
             rows = goals_df.loc[goals_df["TeamName"] == team].sort_values("minute")
 
+            # Group by minute so multiple goals in the same minute are handled
+            # together and stacked with small offsets.
             for m, sub in rows.groupby("minute", sort=False):
+                # Value of the bar at minute m (used to anchor the label)
                 bar_val = float(minute_df.loc[minute_df["minute"] == m, col].values[0])
-                tip_y   = sign * (abs(bar_val) + tip_pad)
+                tip_y = sign * (abs(bar_val) + tip_pad)
 
+                # Small bump if consecutive goals are close in time
                 extra = bump_px if (prev_minute[team] is not None and (m - prev_minute[team]) <= 1) else 0
                 prev_minute[team] = m
 
                 for k, (_, r) in enumerate(sub.iterrows()):
-                    # r['label'] is already "mm'"
+                    # r['label'] is in "mm'" form; suffix with (G) to indicate goal
                     txt = f"{r.get('label','')}".strip() + " (G)"
                     y_off = sign * (base_y_px + extra + k * step_y_px)
                     x_off = jitter_px[k % len(jitter_px)]
                     ax.annotate(
-                        txt, xy=(float(m), tip_y), xycoords="data",
-                        xytext=(x_off, y_off), textcoords="offset points",
-                        ha="center", va="bottom" if sign > 0 else "top",
-                        fontsize=3, color="black",
-                        #bbox=dict(facecolor="white", edgecolor="0.7", alpha=0.85, pad=0.6),
+                        txt,
+                        xy=(float(m), tip_y),
+                        xycoords="data",
+                        xytext=(x_off, y_off),
+                        textcoords="offset points",
+                        ha="center",
+                        va="bottom" if sign > 0 else "top",
+                        fontsize=3,
+                        color="black",
                         clip_on=False,
                     )
     return ax
@@ -208,29 +243,34 @@ def plot_smoothed(minute_df: pd.DataFrame,
     col_home = colors.get(teams[0], "#777777")
     col_away = colors.get(teams[1], "#999999")
 
-    x  = minute_df["minute"].values.astype(float)
-    a  = minute_df["team_a"].values.astype(float)
-    b  = -minute_df["team_b"].values.astype(float)
+    # Convert minute and team columns to numeric arrays for computation.
+    x = minute_df["minute"].values.astype(float)
+    a = minute_df["team_a"].values.astype(float)
+    b = -minute_df["team_b"].values.astype(float)
 
+    # Smooth each team's per-minute series with EWMA. Using dt_minutes=1
+    # assumes that the input frame is strictly per-minute.
     a_s = ewma(a, dt_minutes=1.0, tau_minutes=tau_minutes)
     b_s = ewma(b, dt_minutes=1.0, tau_minutes=tau_minutes)
     net = ewma(a - (-b), dt_minutes=1.0, tau_minutes=tau_minutes)
 
+    # Plot smoothed lines and the net difference (dashed).
     la = ax.plot(x, a_s, color=col_home, linewidth=2, label=teams[0])[0]
     lb = ax.plot(x, b_s, color=col_away, linewidth=2, label=teams[1])[0]
     ln = ax.plot(x, net, color="gray", linestyle="--", linewidth=1, label="Net")[0]
 
-    # add outlines to very light lines
+    # Add stroke outlines to very light-colored lines for legibility.
     _outline_line_if_light(la, col_home)
     _outline_line_if_light(lb, col_away)
 
+    # Add reference lines and compact labels.
     ax.axhline(0, color="black", linewidth=1)
     ax.axvline(HALFTIME_MINUTE, linestyle="--", linewidth=1)
-    ax.set_xlabel("Minute", fontsize=6); ax.set_ylabel("EWMA", fontsize=6)
+    ax.set_xlabel("Minute", fontsize=6)
+    ax.set_ylabel("EWMA", fontsize=6)
     ax.tick_params(axis="both", labelsize=6)
 
     return ax
-
 
 
 # --- Top players (horizontal bars) ----------------
