@@ -16,13 +16,15 @@ from matplotlib.patches import Patch
 from io import BytesIO
 from controllers.auth_controller import logout_button
 from common.ui import sidebar_header
+from common.team_profiles import get_team_profile_map, compute_team_profile_outputs,plot_team_profiles_pca
 
 # --- Header layout knobs (easy to tweak) ---
 HEADER_POS = {
     "title_y":    0.990,  # main title
-    "subtitle_y": 0.945,  # line under title
-    "score_y":    0.912,  # score line
-    "legend_y":   0.878,  # legend baseline
+    "subtitle_y": 0.970,  # line under title
+    "score_y":    0.950,  # score line
+    "profile_y":  0.935,  # team profile line
+    "legend_y":   0.920,  # legend baseline
 }
 
 # Small, readable defaults (apply to figures created after this line)
@@ -124,9 +126,9 @@ def _make_figure(match_row, events, df_attack, minute_df, goals_df, colors_map,
     home_g, away_g = _compute_score(events, match_row["HomeId"], match_row["AwayId"])
 
     # Reserve generous top space so header/legend never overlap plots
-    fig = plt.figure(figsize=(10.5, 6.9))
-    fig.subplots_adjust(top=0.76)  # more margin than before
-    gs = GridSpec(2, 2, figure=fig, hspace=0.35, wspace=0.25)
+    fig = plt.figure(figsize=(12.5, 19.5))
+    fig.subplots_adjust(top=0.86)  # more margin than before
+    gs = GridSpec(3, 2, figure=fig, height_ratios=[1, 1, 1.15], hspace=0.20, wspace=0.25)
 
     # 4 panels
     ax1 = fig.add_subplot(gs[0, 0])
@@ -155,6 +157,19 @@ def _make_figure(match_row, events, df_attack, minute_df, goals_df, colors_map,
                     ax=ax4, show_legend=False)
     ax4.set_title("Cumulative attack rate", fontsize=8, pad=6, loc="left")
 
+    # 5th panel: PCA team profile chart across the full bottom row
+    ax5 = fig.add_subplot(gs[2, :])
+
+    df_profiles, _, _ = compute_team_profile_outputs()
+    if not df_profiles.empty:
+        plot_team_profiles_pca(
+            df_profiles,
+            selected_teams=[home, away],
+            ax=ax5,
+            title="Team tactical clusters",
+        )
+    
+
     # Header block (smaller fonts + extra spacing)
     title    = "FIFA Futsal World Cup"
     subtitle = f'{match_row["StageName"]} • {match_row["GroupName"]} • {match_row.get("LocalDate", match_row.get("KickoffDate",""))}'
@@ -163,6 +178,10 @@ def _make_figure(match_row, events, df_attack, minute_df, goals_df, colors_map,
     fig.suptitle(title, fontsize=13, y=HEADER_POS["title_y"])
     fig.text(0.5, HEADER_POS["subtitle_y"], subtitle, ha="center", va="center", fontsize=8)
     fig.text(0.5, HEADER_POS["score_y"],    scoreln,  ha="center", va="center", fontsize=10)
+    fig.text(0.5, HEADER_POS["profile_y"],
+             f'Team Profiles: {home} — {df_profiles.loc[df_profiles["TeamName"] == home, "ClusterLabel"].values[0]} | '
+             f'{away} — {df_profiles.loc[df_profiles["TeamName"] == away, "ClusterLabel"].values[0]}',
+             ha="center", va="center", fontsize=8)
 
     # Compact legend below the score (use the same color patches)
     handles = [Patch(facecolor=col_home, label=home),
@@ -211,7 +230,9 @@ def main():
 
     match_row = st.session_state["match_row"]
     match_row = __import__("pandas").Series(match_row)
-
+    cluster_map = get_team_profile_map()
+    home_profile = cluster_map.get(str(match_row["HomeName"]), "Unknown")
+    away_profile = cluster_map.get(str(match_row["AwayName"]), "Unknown")
     events, squads, _ = load_match_datasets(match_row)
     df_attack = build_attack_df(events, match_row, squads=squads)
     minute_df = build_minute_matrix(df_attack, match_row)
@@ -229,6 +250,7 @@ def main():
     home_flag, away_flag = _get_flags(match_row)
 
     st.header("Infographic")
+
     fig = _make_figure(match_row, events, df_attack, minute_df, goals_df,
                        colors_map, home_flag, away_flag)
     st.pyplot(fig, use_container_width=True)

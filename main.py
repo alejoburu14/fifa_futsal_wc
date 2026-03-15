@@ -34,6 +34,7 @@ from common.utils import sort_matches_for_select, selectbox_with_placeholder
 from common.ui import sidebar_header   # UI helper for a consistent sidebar
 from common.colors import pick_match_colors
 from common.metrics import parse_time_to_seconds
+from common.team_profiles import get_team_profile_map
 
 # Configure Streamlit page and load environment variables from `.env`.
 st.set_page_config(page_title="Futsal WC — Home", layout="wide")
@@ -111,6 +112,11 @@ def main():
     match_row = match_row.iloc[0]
     st.session_state["match_row"] = match_row.to_dict()
 
+    # Team tactical profiles
+    cluster_map = get_team_profile_map()
+    home_profile = cluster_map.get(str(match_row["HomeName"]), "Unknown")
+    away_profile = cluster_map.get(str(match_row["AwayName"]), "Unknown")
+
     # 6) Persist selection for the Statistics page
     match_row = df_matches.loc[df_matches["MatchId"].astype(str) == str(match_id)]
     if match_row.empty:
@@ -146,6 +152,13 @@ def main():
         f'**Date:** {match_row.get("KickoffDate", "")}  |  '
         f'**Score:** {match_row["HomeName"]} ({home_goals}) - {match_row["AwayName"]} ({away_goals})'
     )
+
+    st.markdown(
+    f"**Team Profiles:** "
+    f"{match_row['HomeName']} — *{home_profile}* | "
+    f"{match_row['AwayName']} — *{away_profile}*"
+    )
+    
     if timeline.empty:
         st.info("No attacking actions found for this match.")
     else:

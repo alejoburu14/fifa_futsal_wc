@@ -33,4 +33,5 @@ def sidebar_header(user: str | None, show_custom_nav: bool = False):
             st.markdown("#### Pages")
             st.page_link("main.py", label="Home", icon="🏠")
             st.page_link("pages/2_Statistics.py", label="Statistics", icon="📊")
-            st.page_link("pages/3_Infographic.py", label="Infographic", icon="🖼️")
+            st.page_link("pages/3_Team_Profiles.py", label="Team Profiles", icon="⚽")
+            st.page_link("pages/4_Infographic.py", label="Infographic", icon="🖼️")

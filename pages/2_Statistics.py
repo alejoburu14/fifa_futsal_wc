@@ -20,6 +20,7 @@ from controllers.data_controller import load_match_datasets
 from controllers.stats_controller import compute_event_stats
 from controllers.auth_controller import logout_button
 from common.ui import sidebar_header
+from common.team_profiles import get_team_profile_map
 
 from common.metrics import (
     build_attack_df, build_minute_matrix, build_goals_only,
@@ -106,6 +107,9 @@ def main():
 
     # Recover selection & load match data
     match_row = pd.Series(st.session_state["match_row"])
+    cluster_map = get_team_profile_map()
+    home_profile = cluster_map.get(str(match_row["HomeName"]), "Unknown")
+    away_profile = cluster_map.get(str(match_row["AwayName"]), "Unknown")
     events, squads, timeline = load_match_datasets(match_row)
     counts, dist = compute_event_stats(events, match_row)
 
@@ -119,7 +123,12 @@ def main():
     col_home, col_away = colors_map.get(home, "#777777"), colors_map.get(away, "#999999")
 
     st.header("Statistics")
-    st.caption("Computed from the full timeline.")
+    st.markdown(
+        f"**Team Profiles:** "
+        f"{match_row['HomeName']} — *{home_profile}* | "
+        f"{match_row['AwayName']} — *{away_profile}*"
+    )
+
 
     # ------------------------------------------------------------
     # TABLE + BAR: Events by team
