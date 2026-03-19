@@ -25,45 +25,62 @@ Notes for a new Python learner:
 
 # Import libraries
 import streamlit as st
-from typing import Dict, List, Optional
+from typing import Dict
 from dotenv import load_dotenv
 
 from controllers.auth_controller import login_page, logout_button
 from controllers.data_controller import load_matches, load_match_datasets
 from common.utils import sort_matches_for_select, selectbox_with_placeholder
-from common.ui import sidebar_header   # UI helper for a consistent sidebar
+from common.ui import sidebar_header
 from common.colors import pick_match_colors
-from common.metrics import parse_time_to_seconds
 from common.team_profiles import get_team_profile_map
 
 # Configure Streamlit page and load environment variables from `.env`.
 st.set_page_config(page_title="Futsal WC — Home", layout="wide")
 load_dotenv(override=False)
 
+
 def main():
     # Consistent sidebar header ABOVE page links
-    user, _ = login_page()       # authenticator object no longer used
+    user, _ = login_page()
     sidebar_header(user=user, show_custom_nav=True)
     logout_button()
 
-    st.title("🏆 FIFA Futsal World Cup — Matches & Timelines")
-    st.caption("Select a match below. The attacking timeline will appear under the box.")
+    st.title("FIFA Futsal World Cup 2024 — Match Explorer")
+    st.caption(
+        "Select a match to view its attacking timeline and unlock the linked analysis "
+        "available across the Statistics, Team Profiles, and Infographic pages."
+    )
 
-    # 4) Load matches
+    # Load matches
     with st.spinner("Loading matches..."):
         df_matches = load_matches()
     if df_matches.empty:
         st.warning("No matches retrieved from the API.")
         return
 
-    # 5) Select box (Groups → Stage → Date → MatchName ordering)
-    st.subheader("Select a match")
+    # Match selection section
+    st.markdown("## Match selection")
+    st.caption("Choose a match to load its timeline and enable the rest of the app pages.")
+
     df_sorted = sort_matches_for_select(df_matches)
 
-    labels = df_sorted.apply(
-        lambda r: f'{r["StageName"]} | {r["GroupName"]} | {r["MatchName"]} | {r["KickoffDate"]}',
-        axis=1
-    ).tolist()
+    def _build_match_label(r):
+        parts = [str(r["StageName"])]
+
+        group = str(r.get("GroupName", "")).strip()
+        if group and r["StageName"] == "Group Matches":
+            parts.append(group)
+
+        parts.extend([
+            str(r["MatchName"]),
+            str(r["KickoffDate"])
+        ])
+
+        return " | ".join(parts)
+
+
+    labels = df_sorted.apply(_build_match_label, axis=1).tolist()
     ids = df_sorted["MatchId"].astype(str).tolist()
 
     # Make labels unique if needed
@@ -79,20 +96,20 @@ def main():
                 new_lab = f"{lab} ({c})"
             label_to_id[new_lab] = mid
 
-    labels = list(label_to_id.keys())         # refresh (unique) labels
+    labels = list(label_to_id.keys())
     ids = list(label_to_id.values())
 
-    # --- Restore previous selection if we have one ---
+    # Restore previous selection if we have one
     default_index = None
     prev_id = st.session_state.get("selected_match_id")
     if prev_id and prev_id in ids:
         default_index = ids.index(prev_id)
 
     selected_label = selectbox_with_placeholder(
-        "Choose a match to view its timeline:",
+        "Choose a match:",
         labels,
-        key="home_match_select",               # stable widget key across reruns/pages
-        default_index=default_index,           # keep selection when returning from Statistics
+        key="home_match_select",
+        default_index=default_index,
     )
 
     if not selected_label:
@@ -102,13 +119,14 @@ def main():
     if not match_id:
         st.stop()
 
-    # Persist for other pages (and for future preselect on Home)
+    # Persist for other pages
     st.session_state["selected_match_id"] = match_id
 
     match_row = df_matches.loc[df_matches["MatchId"].astype(str) == str(match_id)]
     if match_row.empty:
         st.error("Match not found.")
         st.stop()
+
     match_row = match_row.iloc[0]
     st.session_state["match_row"] = match_row.to_dict()
 
@@ -116,14 +134,6 @@ def main():
     cluster_map = get_team_profile_map()
     home_profile = cluster_map.get(str(match_row["HomeName"]), "Unknown")
     away_profile = cluster_map.get(str(match_row["AwayName"]), "Unknown")
-
-    # 6) Persist selection for the Statistics page
-    match_row = df_matches.loc[df_matches["MatchId"].astype(str) == str(match_id)]
-    if match_row.empty:
-        st.error("Match not found.")
-        st.stop()
-    match_row = match_row.iloc[0]
-    st.session_state["match_row"] = match_row.to_dict()
 
     pal = pick_match_colors(
         home_name=match_row["HomeName"],
@@ -133,43 +143,62 @@ def main():
     )
     st.session_state["team_colors"] = {"home": pal.home_color, "away": pal.away_color}
 
-    # 7) Timeline directly under the select box
+    # Load selected match data
     with st.spinner(f'Loading timeline for {match_row["MatchName"]}...'):
         events, squads, timeline = load_match_datasets(match_row)
 
-    st.header("Timeline — Attacking Actions (Attempts & Goals)")
-
-    # Compute the final score from full events (Goal!)
+    # Compute final score from events
     goals = events[events["Description"] == "Goal!"].copy()
     goals["TeamId"] = goals["TeamId"].astype(str)
     home_goals = int((goals["TeamId"] == str(match_row["HomeId"])).sum())
     away_goals = int((goals["TeamId"] == str(match_row["AwayId"])).sum())
 
-    st.caption(
-        f'**Stage:** {match_row["StageName"]}  |  '
-        f'**Group:** {match_row["GroupName"]}  |  '
-        f'**Match:** {match_row["MatchName"]}  |  '
-        f'**Date:** {match_row.get("KickoffDate", "")}  |  '
+    # Selected match overview
+    st.divider()
+    st.markdown("## Selected match overview")
+
+    parts = [
+        f'**Stage:** {match_row["StageName"]}',
+    ]
+
+    # Only add Group if it exists and is meaningful
+    group = str(match_row.get("GroupName", "")).strip()
+    if group and match_row["StageName"] == "Group Matches":
+        parts.append(f'**Group:** {group}')
+
+    parts.extend([
+        f'**Match:** {match_row["MatchName"]}',
+        f'**Date:** {match_row.get("KickoffDate", "")}',
         f'**Score:** {match_row["HomeName"]} ({home_goals}) - {match_row["AwayName"]} ({away_goals})'
-    )
+    ])
+
+    st.markdown(" | ".join(parts))
 
     st.markdown(
-    f"**Team Profiles:** "
-    f"{match_row['HomeName']} — *{home_profile}* | "
-    f"{match_row['AwayName']} — *{away_profile}*"
+        f"**Team profiles:** "
+        f"{match_row['HomeName']} — *{home_profile}* | "
+        f"{match_row['AwayName']} — *{away_profile}*"
     )
-    
+
+    # Timeline section
+    st.markdown("## Attacking timeline")
+    st.caption(
+        "Chronological view of attacking actions recorded in the selected match, "
+        "including attempts and goals."
+    )
+
     if timeline.empty:
-        st.info("No attacking actions found for this match.")
+        st.info("No attacking actions were found for this match in the available event data.")
     else:
+        st.caption("Events are ordered by match time and show the team, action type, and player involved.")
         st.dataframe(
             timeline[["Flag", "TeamName", "Description", "MatchMinute", "PlayerName"]],
             use_container_width=True,
             column_config={
                 "Flag": st.column_config.ImageColumn(" ", width="small"),
-        },
-    )
+            },
+        )
+
 
 if __name__ == "__main__":
     main()
-

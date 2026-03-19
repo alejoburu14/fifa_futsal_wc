@@ -34,34 +34,28 @@ from common.plots import (
 # Explanations for each plot ---
 CHART_DESCRIPTIONS = {
     "momentum": (
-        "This chart shows the **pulse of the game minute by minute**. "
-        "Whenever a team creates chances or scores, its bar grows in that minute "
-        "(goals count a bit more than shots). A **cluster of bars** for one team "
-        "means they enjoyed a spell of pressure; **alternating bars** suggest a "
-        "more end-to-end phase."
+        "Shows attacking pressure minute by minute. Clusters of bars indicate sustained pressure, "
+        "while alternating bars suggest a more balanced or transitional phase."
     ),
     "smoothed": (
-        "Here we **smooth the minute-by-minute noise** to reveal the **trend**. "
-        "When a team’s line rises above zero, they’re generally on top during that spell. "
-        "**Crossovers** signal **momentum swings**; **long gentle rises** reflect sustained control."
+        "Reduces minute-level noise to highlight broader momentum trends. Crossovers indicate swings "
+        "in control, while sustained separation suggests one team had the stronger spell."
     ),
     "top_players": (
-        "These are the **players most involved in attack**. We combine shots and goals "
-        "(with goals counting a bit more) to show **who drove the team forward**. "
-        "Names at the top contributed the most to creating or finishing chances."
+        "Ranks the players with the greatest attacking contribution, combining attempts and goals "
+        "with extra weight assigned to goals."
     ),
     "cumulative": (
-        "This line shows the **running total of attacking actions** as the game unfolds. "
-        "A **steeper climb** means a burst of pressure; a **wider gap** between teams indicates "
-        "one side built a clear edge over time; a **late surge** tells the story of a final push."
+        "Tracks the running total of attacking actions over time. Steeper increases indicate stronger "
+        "pressure, while widening gaps reflect growing attacking advantage."
     ),
 }
-
 
 # Small compact size for the inline figures used on this page
 SMALL_FIGSIZE = (5.2, 2.0)
 
 st.set_page_config(page_title="Statistics", layout="wide")
+
 
 def _ensure_auth():
     if not st.session_state.get("authenticated"):
@@ -70,6 +64,7 @@ def _ensure_auth():
         except Exception:
             st.info("Please sign in on **Home** first.")
             st.stop()
+
 
 def _ensure_match_selected():
     if "match_row" not in st.session_state or not st.session_state["match_row"]:
@@ -88,7 +83,7 @@ def _swatch_row(home: str, away: str, color_home: str, color_away: str):
 
 
 def _is_light(hex_color: str) -> bool:
-    """Perceived luminance to decide if we draw a dark border for very light (e.g., white)."""
+    """Perceived luminance to decide if we draw a dark border for very light colors."""
     h = hex_color.strip().lstrip("#")
     try:
         r, g, b = int(h[0:2], 16) / 255.0, int(h[2:4], 16) / 255.0, int(h[4:6], 16) / 255.0
@@ -110,6 +105,7 @@ def main():
     cluster_map = get_team_profile_map()
     home_profile = cluster_map.get(str(match_row["HomeName"]), "Unknown")
     away_profile = cluster_map.get(str(match_row["AwayName"]), "Unknown")
+
     events, squads, timeline = load_match_datasets(match_row)
     counts, dist = compute_event_stats(events, match_row)
 
@@ -117,30 +113,69 @@ def main():
     colors_map = team_colors_map(match_row)  # {'HomeName': hex, 'AwayName': hex}
     sess_cols = st.session_state.get("team_colors")
     if isinstance(sess_cols, dict):
-        colors_map[str(match_row["HomeName"])] = sess_cols.get("home", colors_map.get(str(match_row["HomeName"])))
-        colors_map[str(match_row["AwayName"])] = sess_cols.get("away", colors_map.get(str(match_row["AwayName"])))
+        colors_map[str(match_row["HomeName"])] = sess_cols.get(
+            "home", colors_map.get(str(match_row["HomeName"]))
+        )
+        colors_map[str(match_row["AwayName"])] = sess_cols.get(
+            "away", colors_map.get(str(match_row["AwayName"]))
+        )
+
     home, away = str(match_row["HomeName"]), str(match_row["AwayName"])
     col_home, col_away = colors_map.get(home, "#777777"), colors_map.get(away, "#999999")
 
-    st.header("Statistics")
+    st.title("Statistics")
+    st.caption(
+        "This page combines descriptive and advanced match analytics to compare team activity, "
+        "attacking momentum, and player contribution."
+    )
+
+    # Compute the final score from full events (Goal!)
+    goals = events[events["Description"] == "Goal!"].copy()
+    goals["TeamId"] = goals["TeamId"].astype(str)
+    home_goals = int((goals["TeamId"] == str(match_row["HomeId"])).sum())
+    away_goals = int((goals["TeamId"] == str(match_row["AwayId"])).sum())
+
+    parts = [
+        f'**Stage:** {match_row["StageName"]}',
+    ]
+
+    # Only add Group if it exists and is meaningful
+    group = str(match_row.get("GroupName", "")).strip()
+    if group and match_row["StageName"] == "Group Matches":
+        parts.append(f'**Group:** {group}')
+
+    parts.extend([
+        f'**Match:** {match_row["MatchName"]}',
+        f'**Date:** {match_row.get("KickoffDate", "")}',
+        f'**Score:** {match_row["HomeName"]} ({home_goals}) - {match_row["AwayName"]} ({away_goals})'
+    ])
+
+    st.markdown(" | ".join(parts))
+
     st.markdown(
         f"**Team Profiles:** "
         f"{match_row['HomeName']} — *{home_profile}* | "
         f"{match_row['AwayName']} — *{away_profile}*"
     )
 
+    # ------------------------------------------------------------
+    # MATCH OVERVIEW
+    # ------------------------------------------------------------
+    st.markdown("## Match overview")
+    st.caption("Basic descriptive statistics on total events and event distribution by team.")
 
     # ------------------------------------------------------------
     # TABLE + BAR: Events by team
     # ------------------------------------------------------------
     st.subheader("Events by team")
+    st.caption("Summary of total recorded match events for each team.")
+
     st.dataframe(
         counts[["Flag", "TeamName", "TotalEvents"]],
         use_container_width=True,
         column_config={"Flag": st.column_config.ImageColumn(" ", width="small")},
     )
 
-    #st.subheader("Events by team (bar)")
     _swatch_row(home, away, col_home, col_away)
 
     fig1, ax1 = plt.subplots(figsize=SMALL_FIGSIZE)
@@ -150,22 +185,24 @@ def main():
         colors_map={home: col_home, away: col_away},
         ax=ax1,
         ylabel="",
-        title="",  # we show title via subheader
+        title="",
     )
     st.pyplot(fig1, use_container_width=False)
+    plt.close(fig1)
 
     # ------------------------------------------------------------
-    # TABLE + GROUPED BARS: Event distribution
+    # TABLE + GROUPED BARS: Event type distribution
     # ------------------------------------------------------------
-    st.subheader("Event distribution by team")
+    st.subheader("Event type distribution by team")
+    st.caption("Breakdown of key event categories recorded for each team.")
     st.caption("Events: Attempt at Goal, Foul, Goal!, Assist, Corner")
+
     st.dataframe(
         dist[["Flag", "TeamName", "Attempt at Goal", "Foul", "Goal!", "Assist", "Corner"]],
         use_container_width=True,
         column_config={"Flag": st.column_config.ImageColumn(" ", width="small")},
     )
 
-    #st.subheader("Event distribution by team (grouped)")
     _swatch_row(home, away, col_home, col_away)
 
     fig2, ax2 = plt.subplots(figsize=SMALL_FIGSIZE)
@@ -174,46 +211,64 @@ def main():
         match_row=match_row,
         colors_map={home: col_home, away: col_away},
         ax=ax2,
-        title="",  # title handled by subheader
+        title="",
     )
     st.pyplot(fig2, use_container_width=False)
+    plt.close(fig2)
 
     # ------------------------------------------------------------
+    # ADVANCED ANALYSIS
+    # ------------------------------------------------------------
+    st.divider()
+    st.markdown("## Advanced analysis")
+    st.caption(
+        "The following charts move from descriptive counts to dynamic match interpretation, "
+        "showing how attacking pressure evolved across time and which players drove it."
+    )
+    st.caption("Team colors are kept consistent across all charts for easier comparison.")
+
     # Advanced plots: momentum, smoothed EWMA, top players, cumulative
-    # ------------------------------------------------------------
-    df_attack = build_attack_df(events, match_row, squads=squads)  # attempts+goals; minute/sec/weights
-    minute_df = build_minute_matrix(df_attack, match_row)          # per-minute mirror
-    goals_df  = build_goals_only(df_attack)                        # only goals for markers
+    df_attack = build_attack_df(events, match_row, squads=squads)
+    minute_df = build_minute_matrix(df_attack, match_row)
+    goals_df = build_goals_only(df_attack)
 
-    st.subheader("Momentum per minute (Attempts=1, Goal=2)")
+    st.subheader("Attacking momentum by minute")
+    st.caption("Weighted attacking actions per minute: Attempt = 1, Goal = 2.")
     _swatch_row(home, away, col_home, col_away)
 
     fig3, ax3 = plt.subplots(figsize=SMALL_FIGSIZE)
     plot_momentum(
-        minute_df, (home, away), goals_df,
+        minute_df,
+        (home, away),
+        goals_df,
         halftime_minute=HALFTIME_MINUTE,
         colors_map={home: col_home, away: col_away},
         ax=ax3,
-        show_legend=False,  # ensure no legend
+        show_legend=False,
     )
     st.pyplot(fig3, use_container_width=False)
+    plt.close(fig3)
     st.caption(CHART_DESCRIPTIONS["momentum"])
 
-    st.subheader(f"Smoothed momentum (EWMA, τ={SMOOTH_TAU_MIN:g} min)")
+    st.subheader("Smoothed attacking momentum")
+    st.caption(f"Exponentially weighted moving average with τ = {SMOOTH_TAU_MIN:g} minutes.")
     _swatch_row(home, away, col_home, col_away)
 
     fig4, ax4 = plt.subplots(figsize=SMALL_FIGSIZE)
     plot_smoothed(
-        minute_df, (home, away),
+        minute_df,
+        (home, away),
         tau_minutes=SMOOTH_TAU_MIN,
         colors_map={home: col_home, away: col_away},
         ax=ax4,
         legend_mode="none",
     )
     st.pyplot(fig4, use_container_width=False)
+    plt.close(fig4)
     st.caption(CHART_DESCRIPTIONS["smoothed"])
 
     st.subheader(f"Top {TOP_N_PLAYERS} attacking players")
+    st.caption("Players ranked by weighted attacking contribution based on attempts and goals.")
     _swatch_row(home, away, col_home, col_away)
 
     fig5, ax5 = plt.subplots(figsize=SMALL_FIGSIZE)
@@ -225,9 +280,11 @@ def main():
         show_legend=False,
     )
     st.pyplot(fig5, use_container_width=False)
+    plt.close(fig5)
     st.caption(CHART_DESCRIPTIONS["top_players"])
 
-    st.subheader("Cumulative attack rate")
+    st.subheader("Cumulative attacking actions")
+    st.caption("Running total of attacking actions across match time.")
     _swatch_row(home, away, col_home, col_away)
 
     fig6, ax6 = plt.subplots(figsize=SMALL_FIGSIZE)
@@ -238,6 +295,7 @@ def main():
         show_legend=False,
     )
     st.pyplot(fig6, use_container_width=False)
+    plt.close(fig6)
     st.caption(CHART_DESCRIPTIONS["cumulative"])
 
 

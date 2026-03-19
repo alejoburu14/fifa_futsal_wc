@@ -1,15 +1,15 @@
-# pages/3_Team_Profiles.py
 from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
 
 from common.ml_labels import CLUSTER_DESCRIPTIONS
-from common.team_profiles import compute_team_profile_outputs, plot_team_profiles_pca
+from common.team_profiles import compute_team_profile_outputs, plot_team_profiles_pca_plotly
 from common.ui import sidebar_header
 from controllers.auth_controller import logout_button
 
 st.set_page_config(page_title="Team Profiles", layout="wide")
+
 
 def _ensure_auth():
     if not st.session_state.get("authenticated"):
@@ -18,6 +18,7 @@ def _ensure_auth():
         except Exception:
             st.info("Please sign in on **Home** first.")
             st.stop()
+
 
 def _ensure_match_selected():
     if "match_row" not in st.session_state or not st.session_state["match_row"]:
@@ -32,8 +33,10 @@ def _get_flags(match_row):
     except Exception:
         try:
             from common.flags import get_flag_url_by_team_id
-            return (get_flag_url_by_team_id(str(match_row["HomeId"])),
-                    get_flag_url_by_team_id(str(match_row["AwayId"])))
+            return (
+                get_flag_url_by_team_id(str(match_row["HomeId"])),
+                get_flag_url_by_team_id(str(match_row["AwayId"])),
+            )
         except Exception:
             return "", ""
 
@@ -76,28 +79,74 @@ def main():
     home_flag, away_flag = _get_flags(match_row)
 
     with st.spinner("Computing team tactical profiles..."):
-        df_profiles, df_cluster_summary, _ = compute_team_profile_outputs()
+        df_profiles, df_cluster_summary, df_attack = compute_team_profile_outputs()
 
     if df_profiles.empty:
         st.warning("Team profile data could not be computed.")
         st.stop()
 
-    st.title("⚽ Team Profiles")
+    st.title("Team Profiles")
     st.caption(
-        "This page shows tactical team profiles."
+        "This page compares the tactical profiles of the selected teams and situates them "
+        "within the tournament-wide clustering model."
     )
 
+    # Compute the final score from full events (Goal!)
+    match_id = str(match_row.get("MatchId", ""))
+    events = (
+        df_attack[df_attack["MatchId"] == match_id].copy()
+        if not df_attack.empty and match_id
+        else pd.DataFrame()
+    )
+    goals = events[events["Description"] == "Goal!"].copy()
+    goals["TeamId"] = goals["TeamId"].astype(str)
+    home_goals = int((goals["TeamId"] == str(match_row["HomeId"])).sum())
+    away_goals = int((goals["TeamId"] == str(match_row["AwayId"])).sum())
+
+    parts = [
+        f'**Stage:** {match_row["StageName"]}',
+    ]
+
+    # Only add Group if it exists and is meaningful
+    group = str(match_row.get("GroupName", "")).strip()
+    if group and match_row["StageName"] == "Group Matches":
+        parts.append(f'**Group:** {group}')
+
+    parts.extend([
+        f'**Match:** {match_row["MatchName"]}',
+        f'**Date:** {match_row.get("KickoffDate", "")}',
+        f'**Score:** {match_row["HomeName"]} ({home_goals}) - {match_row["AwayName"]} ({away_goals})'
+    ])
+
+    st.markdown(" | ".join(parts))
+
     # ------------------------------------------------------------------
-    # Cluster definitions
+    # Tactical profile framework
     # ------------------------------------------------------------------
+    st.markdown("## Tactical profile framework")
+    st.caption(
+        "Teams are grouped according to attacking behavior across the tournament using a clustering model "
+        "based on attacking volume, scoring efficiency, and timing of attacking actions."
+    )
+
     st.subheader("Cluster definitions")
     for label, desc in CLUSTER_DESCRIPTIONS.items():
         st.markdown(f"**{label}** — {desc}")
 
     # ------------------------------------------------------------------
-    # Comparison table for the 2 selected teams
+    # Selected match comparison
     # ------------------------------------------------------------------
-    st.markdown(f"### <img src='{home_flag}' width='35' height='35' style='vertical-align:middle;'> {home_team} vs {away_team} <img src='{away_flag}' width='35' height='35' style='vertical-align:middle;'>", unsafe_allow_html=True)
+    st.markdown("## Selected match comparison")
+    st.caption(
+        "The table below compares the two selected teams across the indicators used to build tactical profiles."
+    )
+
+    st.markdown(
+        f"### <img src='{home_flag}' width='35' height='35' style='vertical-align:middle;'> "
+        f"{home_team} vs {away_team} "
+        f"<img src='{away_flag}' width='35' height='35' style='vertical-align:middle;'>",
+        unsafe_allow_html=True,
+    )
 
     compare_cols = [
         "TeamName",
@@ -113,7 +162,6 @@ def main():
 
     df_two = df_profiles[df_profiles["TeamName"].isin([home_team, away_team])][compare_cols].copy()
 
-    # Build comparison table with indicators as rows and teams as columns
     metrics_order = [
         ("ClusterLabel", "Cluster"),
         ("Attempts_per_Match", "Attempts / Match"),
@@ -135,7 +183,7 @@ def main():
             else:
                 val = val.iloc[0]
                 if metric_col in ["Conversion_Rate", "Early_Attack_Share", "Late_Attack_Share"]:
-                    row_data[team] = f"{val:.2%}"
+                    row_data[team] = f"{val:.1%}"
                 elif metric_col == "ClusterLabel":
                     row_data[team] = str(val)
                 else:
@@ -144,17 +192,27 @@ def main():
 
     df_compare = pd.DataFrame(comparison_rows)
 
+    st.caption("Cluster assignment is shown first, followed by the numerical indicators used in the model.")
     st.dataframe(df_compare, use_container_width=True, hide_index=True)
 
-    st.markdown("**Indicator definitions**")
     defs = _metric_definitions()
-    for _, r in defs.iterrows():
-        st.markdown(f"<small>- **{r['Indicator']}**: {r['Meaning']}</small>", unsafe_allow_html=True)
+    with st.expander("Indicator definitions"):
+        st.dataframe(defs, use_container_width=True, hide_index=True)
 
     # ------------------------------------------------------------------
-    # Team -> Cluster table (alphabetical, highlight the 2 selected teams)
+    # Tournament-wide team clustering
     # ------------------------------------------------------------------
-    st.subheader("Team → Cluster table")
+    st.divider()
+    st.markdown("## Tournament-wide team clustering")
+    st.caption(
+        "The following views place the selected teams within the broader tournament clustering structure."
+    )
+
+    st.subheader("Tournament team profiles")
+    st.caption(
+        "All teams are shown alphabetically with their assigned tactical profile. "
+        "The two teams selected on Home are highlighted."
+    )
 
     table_cols = [
         "TeamName",
@@ -178,29 +236,29 @@ def main():
     )
 
     # ------------------------------------------------------------------
-    # PCA chart (highlight the 2 selected teams)
+    # PCA chart
     # ------------------------------------------------------------------
-    st.subheader("2D cluster visualization (PCA)")
+    st.subheader("Cluster visualization (PCA)")
     st.caption(
-        "PCA is used only for visualization. It reduces the feature space to two dimensions "
-        "so the cluster structure is easier to interpret."
+        "PCA is used only for visualization. It reduces the feature space to two dimensions, "
+        "so teams positioned closer together have more similar attacking profiles. "
+        "Hover over any team to see its name and profile metrics."
     )
 
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    plot_team_profiles_pca(
+    fig = plot_team_profiles_pca_plotly(
         df_profiles,
         selected_teams=[home_team, away_team],
-        ax=ax,
-        title=f"Team tactical clusters — {home_team} vs {away_team}",
+        title="Team tactical clusters",
     )
-    st.pyplot(fig)
+    st.plotly_chart(fig, use_container_width=True)
 
     # ------------------------------------------------------------------
     # Cluster summary
     # ------------------------------------------------------------------
-    st.subheader("Average profile by cluster")
+    st.subheader("Average indicator values by cluster")
+    st.caption(
+        "This table summarizes the typical attacking profile of each tactical cluster."
+    )
     st.dataframe(df_cluster_summary, use_container_width=True)
 
 

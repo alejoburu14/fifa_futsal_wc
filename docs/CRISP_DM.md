@@ -23,8 +23,8 @@ The project aims to analyze FIFA Futsal World Cup data through an interactive St
 - `README.md`
 - `main.py`
 - `pages/2_Statistics.py`
-- `pages/3_Infographic.py`
-- `pages/4_Team_Profiles.py`
+- `pages/3_Team_Profiles.py`
+- `pages/4_Infographic.py`
 
 ---
 
@@ -139,7 +139,7 @@ The model identifies structural differences in offensive behavior:
 
 ### Files mainly related to this phase
 - `common/team_profiles.py`
-- `pages/4_Team_Profiles.py`
+- `pages/3_Team_Profiles.py`
 - `docs/CRISP_DM.md`
 
 ---
@@ -166,7 +166,7 @@ This ensures:
 - a single source of truth
 
 ### Files mainly related to this phase
-- `pages/4_Team_Profiles.py`
+- `pages/3_Team_Profiles.py`
 - `common/team_profiles.py`
 - `common/ml_labels.py`
 

@@ -1,4 +1,3 @@
-# common/team_profiles.py
 """
 Team attacking profile utilities.
 
@@ -148,10 +147,17 @@ def load_all_attacking_events() -> pd.DataFrame:
         all_events.append(df_events[keep_cols])
 
     if not all_events:
-        return pd.DataFrame(columns=[
-            "MatchId", "TeamId", "TeamName", "Description",
-            "MatchMinute", "minute", "is_goal"
-        ])
+        return pd.DataFrame(
+            columns=[
+                "MatchId",
+                "TeamId",
+                "TeamName",
+                "Description",
+                "MatchMinute",
+                "minute",
+                "is_goal",
+            ]
+        )
 
     return pd.concat(all_events, ignore_index=True)
 
@@ -363,8 +369,10 @@ def get_team_profile_map() -> Dict[str, str]:
         return {}
     return dict(zip(df_profiles["TeamName"], df_profiles["ClusterLabel"]))
 
-# common/team_profiles.py
+
 import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
 from common.ml_labels import CLUSTER_COLORS, CLUSTER_ORDER
 
 
@@ -405,24 +413,27 @@ def plot_team_profiles_pca(
             tmp["PC2"],
             label=label,
             color=CLUSTER_COLORS.get(label),
-            s=70,
-            alpha=0.75,
+            s=50,
+            alpha=0.5,
         )
 
-    # 2) Labels for all teams (slightly above the point)
-    for _, r in df_profiles.iterrows():
+    # Highlight selected teams
+    for _, row in df_profiles.iterrows():
+        if row["TeamName"] not in selected_teams:
+            continue
+
         ax.annotate(
-            r["TeamName"],
-            (r["PC1"], r["PC2"]),
-            xytext=(0, 8),              # puts label above the point
+            row["TeamName"],
+            (row["PC1"], row["PC2"]),
+            xytext=(0, 10),
             textcoords="offset points",
             ha="center",
             va="bottom",
-            fontsize=5,
-            alpha=0.7,
+            fontsize=8,
+            fontweight="bold",
+            alpha=0.95,
         )
 
-    # 3) Highlight selected teams
     for team in selected_teams:
         row = df_profiles[df_profiles["TeamName"] == team]
         if row.empty:
@@ -432,7 +443,7 @@ def plot_team_profiles_pca(
         ax.scatter(
             row["PC1"],
             row["PC2"],
-            s=220,
+            s=150,
             color=CLUSTER_COLORS.get(row["ClusterLabel"], "#000000"),
             edgecolor="black",
             linewidth=1,
@@ -444,5 +455,119 @@ def plot_team_profiles_pca(
     ax.set_ylabel("Principal Component 2", fontsize=6)
     ax.grid(alpha=0.2)
     ax.tick_params(labelsize=6)
-    ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=3)
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.15), ncol=3)
     return ax
+
+
+def plot_team_profiles_pca_plotly(
+    df_profiles: pd.DataFrame,
+    selected_teams: list[str] | None = None,
+    title: str = "Team tactical clusters",
+):
+    """
+    Interactive PCA cluster chart using Plotly.
+
+    - All teams appear as points
+    - Selected teams are highlighted and labeled
+    - Non-selected teams show their info on hover
+    """
+    selected_teams = selected_teams or []
+
+    if df_profiles.empty:
+        fig = go.Figure()
+        fig.update_layout(
+            title=title,
+            xaxis_title="Principal Component 1",
+            yaxis_title="Principal Component 2",
+        )
+        return fig
+
+    df_plot = df_profiles.copy()
+    df_plot["IsSelected"] = df_plot["TeamName"].isin(selected_teams)
+    df_plot["TeamLabel"] = df_plot["TeamName"].where(df_plot["IsSelected"], "")
+
+    color_map = {label: CLUSTER_COLORS.get(label) for label in CLUSTER_ORDER}
+
+    fig = px.scatter(
+        df_plot,
+        x="PC1",
+        y="PC2",
+        color="ClusterLabel",
+        color_discrete_map=color_map,
+        category_orders={"ClusterLabel": CLUSTER_ORDER},
+        hover_name="TeamName",
+        hover_data={
+            "ClusterLabel": True,
+            "Attempts_per_Match": ":.2f",
+            "Goals_per_Match": ":.2f",
+            "Conversion_Rate": ":.1%",
+            "Mean_Attack_Minute": ":.2f",
+            "Early_Attack_Share": ":.1%",
+            "Late_Attack_Share": ":.1%",
+            "Attack_Variability": ":.2f",
+            "PC1": False,
+            "PC2": False,
+            "IsSelected": False,
+            "TeamLabel": False,
+        },
+    )
+
+    # Base styling for all teams
+    fig.update_traces(
+        mode="markers",
+        marker=dict(size=10, opacity=0.75),
+    )
+
+    # Overlay selected teams with text labels and stronger marker
+    df_selected = df_plot[df_plot["IsSelected"]].copy()
+    if not df_selected.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=df_selected["PC1"],
+                y=df_selected["PC2"],
+                mode="markers+text",
+                text=df_selected["TeamName"],
+                textposition="top center",
+                textfont=dict(size=11),
+                marker=dict(
+                    size=16,
+                    color=[color_map.get(c, "#000000") for c in df_selected["ClusterLabel"]],
+                    line=dict(color="black", width=1.5),
+                ),
+                hovertemplate=(
+                    "<b>%{text}</b><br>"
+                    "Cluster: %{customdata[0]}<br>"
+                    "Attempts / Match: %{customdata[1]:.2f}<br>"
+                    "Goals / Match: %{customdata[2]:.2f}<br>"
+                    "Conversion Rate: %{customdata[3]:.1%}<br>"
+                    "<extra></extra>"
+                ),
+                customdata=df_selected[
+                    ["ClusterLabel", "Attempts_per_Match", "Goals_per_Match", "Conversion_Rate"]
+                ].to_numpy(),
+                name="Selected teams",
+                showlegend=False,
+            )
+        )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="Principal Component 1",
+        yaxis_title="Principal Component 2",
+        legend_title="",
+        template="plotly_white",
+        height=600,
+        hovermode="closest",
+        margin=dict(l=40, r=40, t=60, b=80),
+
+        # Legend at bottom (centered)
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.2,
+            xanchor="center",
+            x=0.5
+        )
+    )
+
+    return fig
