@@ -6,3 +6,5 @@ pillow>=10.0
 requests>=2.31
 python-dotenv>=1.0
 extra-streamlit-components>=0.1.60,<0.2
+scikit-learn>=1.4,<1.6
+plotly>=5.20,<6
