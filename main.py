@@ -33,7 +33,6 @@ from controllers.data_controller import load_matches, load_match_datasets
 from common.utils import sort_matches_for_select, selectbox_with_placeholder
 from common.ui import sidebar_header
 from common.colors import pick_match_colors
-from common.team_profiles import get_team_profile_map
 
 # Configure Streamlit page and load environment variables from `.env`.
 st.set_page_config(page_title="Futsal WC — Home", layout="wide")
@@ -130,11 +129,6 @@ def main():
     match_row = match_row.iloc[0]
     st.session_state["match_row"] = match_row.to_dict()
 
-    # Team tactical profiles
-    cluster_map = get_team_profile_map()
-    home_profile = cluster_map.get(str(match_row["HomeName"]), "Unknown")
-    away_profile = cluster_map.get(str(match_row["AwayName"]), "Unknown")
-
     pal = pick_match_colors(
         home_name=match_row["HomeName"],
         away_name=match_row["AwayName"],
@@ -173,12 +167,6 @@ def main():
     ])
 
     st.markdown(" | ".join(parts))
-
-    st.markdown(
-        f"**Team profiles:** "
-        f"{match_row['HomeName']} — *{home_profile}* | "
-        f"{match_row['AwayName']} — *{away_profile}*"
-    )
 
     # Timeline section
     st.markdown("## Attacking timeline")

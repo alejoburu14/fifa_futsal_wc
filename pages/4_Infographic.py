@@ -9,22 +9,24 @@ image does not break the page.
 """
 
 # Import libraries
-import streamlit as st
+from io import BytesIO
+
 import matplotlib.pyplot as plt
+import streamlit as st
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
-from io import BytesIO
+
 from controllers.auth_controller import logout_button
 from common.ui import sidebar_header
-from common.team_profiles import get_team_profile_map, compute_team_profile_outputs, plot_team_profiles_pca
+from common.team_profiles import compute_team_profile_outputs, plot_team_profiles_pca
 
 # --- Header layout knobs (easy to tweak) ---
 HEADER_POS = {
-    "title_y":    0.972,
+    "title_y": 0.972,
     "subtitle_y": 0.952,
-    "score_y":    0.932,
-    "profile_y":  0.917,
-    "legend_y":   0.899,
+    "score_y": 0.932,
+    "profile_y": 0.914,
+    "legend_y": 0.895,
 }
 
 # Small, readable defaults (apply to figures created after this line)
@@ -64,26 +66,13 @@ def _compute_score(events, home_id, away_id):
     return home, away
 
 
-def _add_flag(fig: plt.Figure, url: str, left: float, top: float, width: float = 0.10):
-    """Place a flag image at (left, top) in figure coordinates.
-
-    Implementation notes:
-      - This helper is intentionally forgiving: failure to download or open
-        the image is caught and silently ignored so that missing flags do not
-        break the infographic generation.
-      - A desktop User-Agent header is used because some image servers
-        block default Python UA strings.
-      - The image is placed using `fig.add_axes` with absolute figure
-        coordinates so flags remain in consistent positions regardless of
-        subplot layouts.
-    """
+@st.cache_data(show_spinner=False)
+def _download_flag_bytes(url: str) -> bytes | None:
     if not url:
-        return
+        return None
 
     try:
-        from PIL import Image
         import requests
-        from io import BytesIO as _BIO
 
         headers = {
             "User-Agent": (
@@ -95,15 +84,50 @@ def _add_flag(fig: plt.Figure, url: str, left: float, top: float, width: float =
 
         r = requests.get(url, timeout=8, headers=headers)
         r.raise_for_status()
-        im = Image.open(_BIO(r.content)).convert("RGBA")
+        return r.content
+    except Exception:
+        return None
+
+
+def _add_flag(fig: plt.Figure, url: str, left: float, top: float, width: float = 0.10):
+    """Place a flag image at (left, top) in figure coordinates."""
+    if not url:
+        return
+
+    try:
+        from PIL import Image
+        from io import BytesIO as _BIO
+
+        content = _download_flag_bytes(url)
+        if not content:
+            return
+
+        im = Image.open(_BIO(content)).convert("RGBA")
     except Exception:
         return
 
     w = width
-    h = width * (im.size[1] / im.size[0])  # keep aspect ratio
+    h = width * (im.size[1] / im.size[0])
     ax_img = fig.add_axes([left, top - h, w, h], anchor="NW")
     ax_img.imshow(im)
     ax_img.axis("off")
+
+
+def _draw_centered_split(fig, y, text, fontsize=10, color="black", weight=None):
+    """
+    Draw a text line centered on the separator ' - ' so the hyphen aligns
+    vertically across multiple lines.
+    """
+    if " - " not in text:
+        fig.text(0.5, y, text, ha="center", va="center", fontsize=fontsize, color=color, fontweight=weight)
+        return
+
+    left, right = text.split(" - ", 1)
+    cx, gap = 0.5, 0.003
+
+    fig.text(cx - gap, y, left, ha="right", va="center", fontsize=fontsize, color=color, fontweight=weight)
+    fig.text(cx, y, "-", ha="center", va="center", fontsize=fontsize, color=color, fontweight=weight)
+    fig.text(cx + gap, y, right, ha="left", va="center", fontsize=fontsize, color=color, fontweight=weight)
 
 
 def _make_figure(match_row, events, df_attack, minute_df, goals_df, colors_map,
@@ -182,9 +206,9 @@ def _make_figure(match_row, events, df_attack, minute_df, goals_df, colors_map,
 
     # Header block
     title = "FIFA Futsal World Cup — Match Infographic"
-    parts = [str(match_row["StageName"]).strip()]
 
-    if match_row["StageName"] == "Group Matches":
+    parts = [str(match_row["StageName"]).strip()]
+    if str(match_row["StageName"]).strip() == "Group Matches":
         group = str(match_row.get("GroupName", "")).strip()
         if group:
             parts.append(group)
@@ -193,7 +217,7 @@ def _make_figure(match_row, events, df_attack, minute_df, goals_df, colors_map,
     if date_val:
         parts.append(str(date_val).strip())
 
-    subtitle = " • ".join(parts)
+    subtitle = " - ".join(parts)
     scoreln = f"{home} {home_g} - {away_g} {away}"
 
     fig.text(
@@ -206,37 +230,33 @@ def _make_figure(match_row, events, df_attack, minute_df, goals_df, colors_map,
         fontweight="bold",
     )
 
-    fig.text(
-        0.5,
+    _draw_centered_split(
+        fig,
         HEADER_POS["subtitle_y"],
         subtitle,
-        ha="center",
-        va="center",
         fontsize=10,
         color="dimgray",
     )
 
-    fig.text(
-        0.5,
+    _draw_centered_split(
+        fig,
         HEADER_POS["score_y"],
         scoreln,
-        ha="center",
-        va="center",
         fontsize=12,
-        fontweight="semibold",
+        color="black",
+        weight="semibold",
     )
 
     cluster_map = dict(zip(df_profiles["TeamName"], df_profiles["ClusterLabel"])) if not df_profiles.empty else {}
     home_profile = cluster_map.get(home, "Unknown")
     away_profile = cluster_map.get(away, "Unknown")
 
-    fig.text(
-        0.5,
+    _draw_centered_split(
+        fig,
         HEADER_POS["profile_y"],
         f"{home_profile} - {away_profile}",
-        ha="center",
-        va="center",
         fontsize=9,
+        color="black",
     )
 
     # Compact legend below the score
@@ -320,9 +340,7 @@ def main():
     home_flag, away_flag = _get_flags(match_row)
 
     st.header("Infographic")
-    st.caption(
-        "Static summary figure designed for academic presentation and PDF export."
-    )
+    st.caption("Static summary figure designed for academic presentation and PDF export.")
 
     fig = _make_figure(
         match_row,

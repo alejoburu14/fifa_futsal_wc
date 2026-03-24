@@ -60,7 +60,7 @@ def _extract_minute(series: pd.Series) -> pd.Series:
     )
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=None, show_spinner=False)
 def load_all_matches() -> pd.DataFrame:
     """
     Load all competition matches using the same helper as the rest of the app.
@@ -74,7 +74,7 @@ def load_all_matches() -> pd.DataFrame:
     return df_matches
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=None, show_spinner=False)
 def load_all_attacking_events() -> pd.DataFrame:
     """
     Load attacking events for every match in the competition.
@@ -303,7 +303,7 @@ def _assign_cluster_labels(df_profiles: pd.DataFrame) -> pd.DataFrame:
     return df_profiles
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=None, show_spinner=False)
 def compute_team_profile_outputs(n_clusters: int = 3):
     """
     End-to-end pipeline for team tactical profiles.
@@ -358,7 +358,7 @@ def compute_team_profile_outputs(n_clusters: int = 3):
     return df_profiles, df_cluster_summary, df_attack
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=None, show_spinner=False)
 def get_team_profile_map() -> Dict[str, str]:
     """
     Convenient lookup used by other pages:

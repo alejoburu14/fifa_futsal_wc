@@ -34,7 +34,7 @@ DB_PATH = Path(__file__).resolve().parents[1] / "assets" / "team_colors.db"
 
 
 # -------------------- SQLite loader --------------------
-@st.cache_data(ttl=86400, show_spinner=False)
+@st.cache_data(ttl=None, show_spinner=False)
 def load_colors_db(db_path: Optional[str] = None) -> pd.DataFrame:
     """
     Load team colors from the SQLite DB.

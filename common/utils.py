@@ -49,7 +49,7 @@ def i18n_desc(lst: Any, default: str = "") -> str:
         return str(lst[0].get("Description", default) or default)
     return default
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=None, show_spinner=False)
 def get_matches(season_id: str, count: int = 500) -> pd.DataFrame:
     # Fetch match calendar JSON from the API and transform into a DataFrame.
     # This function is cached with `st.cache_data` so repeated UI reruns within
@@ -87,7 +87,7 @@ def get_matches(season_id: str, count: int = 500) -> pd.DataFrame:
     df["KickoffTS"] = pd.to_datetime(df["KickoffTS"], errors="coerce")
     return df
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_data(ttl=None, show_spinner=False)
 def get_match_events(competition_id: str, season_id: str, stage_id: str, match_id: str) -> pd.DataFrame:
     # Fetch the match timeline JSON and convert into a DataFrame of interest.
     data = fifa_get(f"/timelines/{competition_id}/{season_id}/{stage_id}/{match_id}")
@@ -102,7 +102,7 @@ def get_match_events(competition_id: str, season_id: str, stage_id: str, match_i
         "MatchMinute": [e.get("MatchMinute", "") for e in events],
     })
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@st.cache_data(ttl=None, show_spinner=False)
 def get_players_for_teams(team_ids: Iterable[str], competition_id: str, season_id: str) -> pd.DataFrame:
     # For each requested team, call the squad endpoint and extract a small
     # players table. Cache the result because squad rosters rarely change.
