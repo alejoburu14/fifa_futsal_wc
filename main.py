@@ -82,7 +82,10 @@ def main():
     labels = df_sorted.apply(_build_match_label, axis=1).tolist()
     ids = df_sorted["MatchId"].astype(str).tolist()
 
-    # Make labels unique if needed
+    # Make labels unique if needed. Some matches can produce identical descriptive
+    # labels (same teams + date, different match IDs), so we append (2), (3), etc.
+    # This keeps the selectbox options user-friendly while preserving one-to-one
+    # mapping to MatchId.
     label_to_id: Dict[str, str] = {}
     for lab, mid in zip(labels, ids):
         if lab not in label_to_id:

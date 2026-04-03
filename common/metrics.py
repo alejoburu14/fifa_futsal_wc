@@ -36,6 +36,8 @@ WHITELIST_ATTACK  = {"Attempt at Goal", "Goal!"}
 
 
 # ---------- Small helpers ----------
+# NOTE: These smaller helpers are used by plotting functions in common/plots.py
+# and by controllers/stats_controller.py, so keeping them explicit helps beginners.
 def teams_ordered(series_or_iter: Iterable[str]) -> Tuple[str, str]:
     """Return a (team_a, team_b) tuple preserving the first two unique items."""
     uniq = []

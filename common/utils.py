@@ -134,10 +134,20 @@ def stage_order(stage: str) -> int:
     return 700
 
 def sort_matches_for_select(df: pd.DataFrame) -> pd.DataFrame:
+    # Work on a copy so we don't modify the caller's DataFrame in place.
+    # This is safer for users unfamiliar with pandas copy-vs-view behavior.
     df = df.copy()
+
+    # Group matches are shown first, then knockout stages. `__is_group` is a
+    # helper flag for ordering and is dropped before returning.
     df["__is_group"] = df["GroupName"].fillna("").str.contains(r"Group\s+[A-Z]", case=False, regex=True)
+
+    # `group_rank` gives A=1, B=2 etc; `stage_order` defines common tournament order.
     df["__g_rank"], df["__s_rank"] = df["GroupName"].map(group_rank), df["StageName"].map(stage_order)
+
+    # Keep known dates before unknown dates so the most complete events appear first.
     df["__has_date"] = df["KickoffTS"].notna()
+
     df = df.sort_values(by=["__is_group","__g_rank","__s_rank","__has_date","KickoffTS","MatchName"],
                         ascending=[False,True,True,False,True,True], kind="mergesort")
     return df.drop(columns=["__is_group","__g_rank","__s_rank","__has_date"])

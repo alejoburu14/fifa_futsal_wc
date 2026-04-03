@@ -37,8 +37,8 @@ CHART_DESCRIPTIONS = {
         "while alternating bars suggest a more balanced or transitional phase."
     ),
     "smoothed": (
-        "Reduces minute-level noise to highlight broader momentum trends. Crossovers indicate swings "
-        "in control, while sustained separation suggests one team had the stronger spell."
+        "Reduces minute-level noise to highlight broader momentum trends. Sustained separation"
+        " indicates one team dominated. Changes toward the zero line suggest shifts in momentum."
     ),
     "top_players": (
         "Ranks the players with the greatest attacking contribution, combining attempts and goals "
